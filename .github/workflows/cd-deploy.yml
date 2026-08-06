@@ -20,13 +20,15 @@ jobs:
         shell: powershell
         run: |
           if (Get-Command 'docker' -ErrorAction SilentlyContinue) {
-            try { docker compose version > $null 2>&1; $compose = 'docker compose' } catch { $compose = 'docker-compose' }
+                  try { docker compose version > $null 2>&1; $bin = 'docker'; $args = 'compose' } catch { $bin = 'docker-compose'; $args = '' }
           } else {
             Write-Error "Docker CLI not found"
             exit 1
           }
-          Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_CMD=$compose"
-          Write-Host "COMPOSE_CMD set to: $compose"
+                Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_BIN=$bin"
+                Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_ARGS=$args"
+                Write-Host "COMPOSE_BIN set to: $bin"
+                Write-Host "COMPOSE_ARGS set to: $args"
 
       # Detect compose command on Linux/macOS
       - name: Detect compose command (Unix)
@@ -47,8 +49,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Write-Host "Using: $env:COMPOSE_CMD"
-          & $env:COMPOSE_CMD build
+          Write-Host "Using: $env:COMPOSE_BIN $env:COMPOSE_ARGS"
+                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS build } else { & $env:COMPOSE_BIN build }
 
       - name: Build services (docker compose - Unix)
         if: runner.os != 'Windows'
@@ -63,11 +65,11 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Starting services and running tests..."
-          & $env:COMPOSE_CMD up --abort-on-container-exit --exit-code-from test
+                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS up --abort-on-container-exit --exit-code-from test } else { & $env:COMPOSE_BIN up --abort-on-container-exit --exit-code-from test }
           $exit = $LASTEXITCODE
 
           Write-Host "Tests finished with exit code: $exit. Tearing down..."
-          & $env:COMPOSE_CMD down --volumes --remove-orphans
+                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS down --volumes --remove-orphans } else { & $env:COMPOSE_BIN down --volumes --remove-orphans }
 
           exit $exit
 
