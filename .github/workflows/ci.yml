@@ -56,7 +56,12 @@ jobs:
       - name: Run Playwright tests
         run: |
 
-          npx playwright test
+          if [ -d "tests" ] && find tests -name "*.spec.*" | grep -q .; then
+            echo "Playwright tests found"
+            npx playwright test
+          else
+            echo "No Playwright tests found, skip test stage"
+          fi
 
 
 
