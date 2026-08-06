@@ -2,7 +2,6 @@ name: Deploy Playwright Service
 
 
 on:
-
   push:
     branches:
       - main
@@ -12,6 +11,8 @@ jobs:
 
   deploy:
 
+    name: Build and Run Docker Container
+
     runs-on:
       - self-hosted
       - Windows
@@ -20,12 +21,14 @@ jobs:
     steps:
 
 
+    # 拉取代码
     - name: Checkout code
       uses: actions/checkout@v4
 
 
 
-    - name: Check files
+    # 查看当前目录，确认 Dockerfile
+    - name: Check project files
       shell: powershell
       run: |
 
@@ -34,6 +37,7 @@ jobs:
 
 
 
+    # 构建 Docker 镜像
     - name: Build Docker image
       shell: powershell
       run: |
@@ -42,16 +46,29 @@ jobs:
 
 
 
+    # 删除旧容器
     - name: Remove old container
       shell: powershell
       run: |
 
-        docker rm -f playwright-service 2>$null
+        $container = docker ps -aq -f name=playwright-service
 
-        Write-Host "Old container removed or not exists"
+        if ($container) {
+
+            docker rm -f playwright-service
+
+            Write-Host "Old container removed."
+
+        }
+        else {
+
+            Write-Host "No old container found."
+
+        }
 
 
 
+    # 后台启动新容器
     - name: Start container
       shell: powershell
       run: |
@@ -62,9 +79,31 @@ jobs:
           playwright-test:latest
 
 
+        if ($LASTEXITCODE -ne 0) {
 
+            Write-Error "Container start failed"
+
+            exit 1
+
+        }
+
+
+
+    # 查看运行状态
     - name: Verify container
       shell: powershell
       run: |
 
         docker ps
+
+        docker logs --tail 50 playwright-service
+
+
+
+    # 完成
+    - name: Deployment finished
+      shell: powershell
+      run: |
+
+        Write-Host "Deployment completed."
+        Write-Host "Container keeps running."
