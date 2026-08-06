@@ -1,33 +1,75 @@
-name: Playwright Test
+name: Deploy Playwright Service
 
 
 on:
 
   push:
+    branches:
+      - main
 
   pull_request:
 
 
 jobs:
 
-  test:
+  deploy:
 
-    runs-on: ubuntu-latest
+    name: Build and Start Container
+
+    # 必须使用自己的机器
+    runs-on: [self-hosted, linux]
 
 
     steps:
 
+
+    # 拉代码
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
 
+
+    # 构建镜像
     - name: Build Docker image
-      run:
+      run: |
 
-        docker build -t playwright-test .
+        docker build \
+          -t playwright-test:latest .
 
 
-    - name: Run Test
-      run:
 
-        docker run playwright-test
+    # 删除旧容器（如果存在）
+    - name: Remove old container
+      run: |
+
+        docker rm -f playwright-service || true
+
+
+
+    # 后台启动容器
+    - name: Start container
+      run: |
+
+        docker run \
+          -d \
+          --name playwright-service \
+          --restart always \
+          playwright-test:latest
+
+
+
+    # 查看启动状态
+    - name: Verify container
+      run: |
+
+        docker ps -a
+
+        docker logs --tail 50 playwright-service
+
+
+
+    - name: Deployment finished
+      run: |
+
+        echo "Container started successfully."
+        echo "GitHub Actions can exit now."
