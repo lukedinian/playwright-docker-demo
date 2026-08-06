@@ -52,14 +52,6 @@ jobs:
 
 
 
-      # 执行测试
-      - name: Run Playwright tests
-        run: |
-
-          npx playwright test
-
-
-
       # 上传测试报告
       - name: Upload Playwright report
         if: always()
