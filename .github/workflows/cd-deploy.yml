@@ -45,19 +45,33 @@ jobs:
           echo "COMPOSE_CMD set to: $COMPOSE_CMD"
 
       # Build services (platform-specific invocation)
+      - name: Cleanup previous compose state (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+                Write-Host "Cleaning previous compose stacks if any..."
+                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS down --volumes --remove-orphans } else { & $env:COMPOSE_BIN down --volumes --remove-orphans }
+
+      - name: Cleanup previous compose state (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+                echo "Cleaning previous compose stacks if any..."
+                $COMPOSE_CMD down --volumes --remove-orphans || true
+
       - name: Build services (docker compose)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Write-Host "Using: $env:COMPOSE_BIN $env:COMPOSE_ARGS"
+                Write-Host "Using: $env:COMPOSE_BIN $env:COMPOSE_ARGS"
                 if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS build } else { & $env:COMPOSE_BIN build }
 
       - name: Build services (docker compose - Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          echo "Using: $COMPOSE_CMD"
-          $COMPOSE_CMD build
+                echo "Using: $COMPOSE_CMD"
+                $COMPOSE_CMD build
 
       # Run tests and return exit code (Windows)
       - name: Run tests (docker compose) and return exit code (Windows)
