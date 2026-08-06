@@ -46,7 +46,9 @@ jobs:
       shell: powershell
       run: |
 
-        docker rm -f playwright-service 2>$null || echo "No old container"
+        docker rm -f playwright-service 2>$null
+
+        Write-Host "Old container removed or not exists"
 
 
 
