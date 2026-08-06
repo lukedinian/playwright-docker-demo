@@ -7,69 +7,62 @@ on:
     branches:
       - main
 
-  pull_request:
-
 
 jobs:
 
   deploy:
 
-    name: Build and Start Container
-
-    # 必须使用自己的机器
-    runs-on: [self-hosted, windows]
+    runs-on:
+      - self-hosted
+      - Windows
 
 
     steps:
 
 
-    # 拉代码
     - name: Checkout code
       uses: actions/checkout@v4
 
 
 
-    # 构建镜像
+    - name: Check files
+      shell: powershell
+      run: |
+
+        pwd
+        dir
+
+
+
     - name: Build Docker image
+      shell: powershell
       run: |
 
-        docker build \
-          -t playwright-test:latest .
+        docker build -t playwright-test:latest .
 
 
 
-    # 删除旧容器（如果存在）
     - name: Remove old container
+      shell: powershell
       run: |
 
-        docker rm -f playwright-service || true
+        docker rm -f playwright-service 2>$null || echo "No old container"
 
 
 
-    # 后台启动容器
     - name: Start container
+      shell: powershell
       run: |
 
-        docker run \
-          -d \
-          --name playwright-service \
-          --restart always \
+        docker run -d `
+          --name playwright-service `
+          --restart always `
           playwright-test:latest
 
 
 
-    # 查看启动状态
     - name: Verify container
+      shell: powershell
       run: |
 
-        docker ps -a
-
-        docker logs --tail 50 playwright-service
-
-
-
-    - name: Deployment finished
-      run: |
-
-        echo "Container started successfully."
-        echo "GitHub Actions can exit now."
+        docker ps
