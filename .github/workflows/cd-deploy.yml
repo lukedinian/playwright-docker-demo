@@ -1,0 +1,45 @@
+name: CD — Deploy to self-hosted Windows
+
+on:
+  push:
+    branches:
+      - main   # 或你想触发部署的分支
+
+jobs:
+  deploy:
+    name: Deploy on self-hosted runner
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        shell: pwsh
+        run: |
+          docker build -t playwright-docker-demo:latest .
+
+      - name: Stop and remove existing container (if any)
+        shell: pwsh
+        run: |
+          $existing = docker ps -q -f "name=playwright-docker-demo"
+          if ($existing) {
+            Write-Host "Stopping container..."
+            docker stop $existing
+          }
+          $existingAll = docker ps -a -q -f "name=playwright-docker-demo"
+          if ($existingAll) {
+            Write-Host "Removing container..."
+            docker rm $existingAll
+          }
+
+      - name: Run container
+        shell: pwsh
+        run: |
+          # 这里假设 app 在容器内监听 3000，宿主映射 3000:3000
+          docker run -d --restart unless-stopped --name playwright-docker-demo -p 3000:3000 playwright-docker-demo:latest
+
+      - name: Verify (optional)
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 3
+          docker ps --filter "name=playwright-docker-demo"
