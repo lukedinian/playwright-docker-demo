@@ -14,44 +14,73 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Detect compose command on Windows (PowerShell)
+      - name: Detect compose command (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Get-Command 'docker' -ErrorAction SilentlyContinue) {
+            try { docker compose version > $null 2>&1; $compose = 'docker compose' } catch { $compose = 'docker-compose' }
+          } else {
+            Write-Error "Docker CLI not found"
+            exit 1
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_CMD=$compose"
+          Write-Host "COMPOSE_CMD set to: $compose"
+
+      # Detect compose command on Linux/macOS
+      - name: Detect compose command (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if command -v docker >/dev/null 2>&1; then
+            if docker compose version >/dev/null 2>&1; then COMPOSE_CMD='docker compose'; else COMPOSE_CMD='docker-compose'; fi
+          else
+            echo "Docker CLI not found" >&2
+            exit 1
+          fi
+          echo "COMPOSE_CMD=$COMPOSE_CMD" >> $GITHUB_ENV
+          echo "COMPOSE_CMD set to: $COMPOSE_CMD"
+
+      # Build services (platform-specific invocation)
       - name: Build services (docker compose)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Detect whether to use 'docker compose' (v2) or 'docker-compose' (v1)
-          if (Get-Command 'docker' -ErrorAction SilentlyContinue) {
-            try {
-              docker compose version > $null 2>&1
-              $composeCmd = 'docker compose'
-            } catch {
-              $composeCmd = 'docker-compose'
-            }
-          } else {
-            Write-Error "Docker CLI not found"
-            exit 1
-          }
-          Write-Host "Using compose command: $composeCmd"
-          & $composeCmd build
+          Write-Host "Using: $env:COMPOSE_CMD"
+          & $env:COMPOSE_CMD build
 
-      - name: Run tests (docker compose) and return exit code
+      - name: Build services (docker compose - Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "Using: $COMPOSE_CMD"
+          $COMPOSE_CMD build
+
+      # Run tests and return exit code (Windows)
+      - name: Run tests (docker compose) and return exit code (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (Get-Command 'docker' -ErrorAction SilentlyContinue) {
-            try {
-              docker compose version > $null 2>&1
-              $composeCmd = 'docker compose'
-            } catch {
-              $composeCmd = 'docker-compose'
-            }
-          } else {
-            Write-Error "Docker CLI not found"
-            exit 1
-          }
-
           Write-Host "Starting services and running tests..."
-          & $composeCmd up --abort-on-container-exit --exit-code-from test
+          & $env:COMPOSE_CMD up --abort-on-container-exit --exit-code-from test
           $exit = $LASTEXITCODE
 
           Write-Host "Tests finished with exit code: $exit. Tearing down..."
-          & $composeCmd down --volumes --remove-orphans
+          & $env:COMPOSE_CMD down --volumes --remove-orphans
 
           exit $exit
+
+      # Run tests and return exit code (Unix)
+      - name: Run tests (docker compose) and return exit code (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "Starting services and running tests..."
+          $COMPOSE_CMD up --abort-on-container-exit --exit-code-from test
+          exit_code=$?
+
+          echo "Tests finished with exit code: $exit_code. Tearing down..."
+          $COMPOSE_CMD down --volumes --remove-orphans
+
+          exit $exit_code
