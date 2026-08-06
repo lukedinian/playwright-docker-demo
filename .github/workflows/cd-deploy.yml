@@ -1,4 +1,4 @@
-name: CD — Run tests with docker-compose on self-hosted runner
+name: CD — Deploy with docker-compose on self-hosted runner
 
 on:
   push:
@@ -6,97 +6,143 @@ on:
       - main
 
 jobs:
-  run-tests:
-    name: Run tests on self-hosted runner
+  deploy:
+    name: Deploy services on self-hosted runner
     runs-on: [self-hosted, windows]
 
     steps:
+
+      # 拉取代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Detect compose command on Windows (PowerShell)
-      - name: Detect compose command (Windows)
-        if: runner.os == 'Windows'
+
+      # 检测 docker compose
+      - name: Detect compose command
         shell: powershell
         run: |
-          if (Get-Command 'docker' -ErrorAction SilentlyContinue) {
-                  try { docker compose version > $null 2>&1; $bin = 'docker'; $args = 'compose' } catch { $bin = 'docker-compose'; $args = '' }
-          } else {
+          if (Get-Command docker -ErrorAction SilentlyContinue) {
+
+            docker compose version > $null 2>&1
+
+            if ($LASTEXITCODE -eq 0) {
+              $bin = "docker"
+              $args = "compose"
+            }
+            else {
+              $bin = "docker-compose"
+              $args = ""
+            }
+
+          }
+          else {
             Write-Error "Docker CLI not found"
             exit 1
           }
-                Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_BIN=$bin"
-                Add-Content -Path $env:GITHUB_ENV -Value "COMPOSE_ARGS=$args"
-                Write-Host "COMPOSE_BIN set to: $bin"
-                Write-Host "COMPOSE_ARGS set to: $args"
 
-      # Detect compose command on Linux/macOS
-      - name: Detect compose command (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
+
+          Add-Content $env:GITHUB_ENV "COMPOSE_BIN=$bin"
+          Add-Content $env:GITHUB_ENV "COMPOSE_ARGS=$args"
+
+
+          Write-Host "Compose command:"
+          Write-Host "$bin $args"
+
+
+
+      # 停止旧服务
+      - name: Stop old services
+        shell: powershell
         run: |
-          if command -v docker >/dev/null 2>&1; then
-            if docker compose version >/dev/null 2>&1; then COMPOSE_CMD='docker compose'; else COMPOSE_CMD='docker-compose'; fi
-          else
-            echo "Docker CLI not found" >&2
+
+          Write-Host "Stopping old compose services..."
+
+          if ($env:COMPOSE_ARGS -ne "") {
+
+            & $env:COMPOSE_BIN $env:COMPOSE_ARGS down `
+              --remove-orphans
+
+          }
+          else {
+
+            & $env:COMPOSE_BIN down `
+              --remove-orphans
+
+          }
+
+
+      # 构建镜像
+      - name: Build services
+        shell: powershell
+        run: |
+
+          Write-Host "Building docker images..."
+
+          if ($env:COMPOSE_ARGS -ne "") {
+
+            & $env:COMPOSE_BIN $env:COMPOSE_ARGS build
+
+          }
+          else {
+
+            & $env:COMPOSE_BIN build
+
+          }
+
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Docker build failed"
             exit 1
-          fi
-          echo "COMPOSE_CMD=$COMPOSE_CMD" >> $GITHUB_ENV
-          echo "COMPOSE_CMD set to: $COMPOSE_CMD"
+          }
 
-      # Build services (platform-specific invocation)
-      - name: Cleanup previous compose state (Windows)
-        if: runner.os == 'Windows'
+
+
+      # 后台启动服务
+      - name: Start services
         shell: powershell
         run: |
-                Write-Host "Cleaning previous compose stacks if any..."
-                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS down --volumes --remove-orphans } else { & $env:COMPOSE_BIN down --volumes --remove-orphans }
 
-      - name: Cleanup previous compose state (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-                echo "Cleaning previous compose stacks if any..."
-                $COMPOSE_CMD down --volumes --remove-orphans || true
+          Write-Host "Starting services in background..."
 
-      - name: Build services (docker compose)
-        if: runner.os == 'Windows'
+          if ($env:COMPOSE_ARGS -ne "") {
+
+            & $env:COMPOSE_BIN $env:COMPOSE_ARGS up -d
+
+          }
+          else {
+
+            & $env:COMPOSE_BIN up -d
+
+          }
+
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Docker compose start failed"
+            exit 1
+          }
+
+
+          Write-Host "Services started successfully"
+
+
+
+      # 查看状态
+      - name: Verify services
         shell: powershell
         run: |
-                Write-Host "Using: $env:COMPOSE_BIN $env:COMPOSE_ARGS"
-                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS build } else { & $env:COMPOSE_BIN build }
 
-      - name: Build services (docker compose - Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-                echo "Using: $COMPOSE_CMD"
-                $COMPOSE_CMD build
+          Write-Host "Checking running containers..."
 
-      # Run tests and return exit code (Windows)
-      - name: Run tests (docker compose) and return exit code (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          Write-Host "Starting services and running tests..."
-                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS up --abort-on-container-exit --exit-code-from test } else { & $env:COMPOSE_BIN up --abort-on-container-exit --exit-code-from test }
-          $exit = $LASTEXITCODE
+          if ($env:COMPOSE_ARGS -ne "") {
 
-          Write-Host "Tests finished with exit code: $exit. Tearing down..."
-                if ($env:COMPOSE_ARGS -ne '') { & $env:COMPOSE_BIN $env:COMPOSE_ARGS down --volumes --remove-orphans } else { & $env:COMPOSE_BIN down --volumes --remove-orphans }
+            & $env:COMPOSE_BIN $env:COMPOSE_ARGS ps
 
-          exit $exit
+          }
+          else {
 
-      # Run tests and return exit code (Unix)
-      - name: Run tests (docker compose) and return exit code (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          echo "Starting services and running tests..."
-          $COMPOSE_CMD up --abort-on-container-exit --exit-code-from test
-          exit_code=$?
+            & $env:COMPOSE_BIN ps
 
-          echo "Tests finished with exit code: $exit_code. Tearing down..."
-          $COMPOSE_CMD down --volumes --remove-orphans
+          }
 
-          exit $exit_code
+
+          Write-Host "Deployment finished."
