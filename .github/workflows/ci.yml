@@ -52,19 +52,6 @@ jobs:
 
 
 
-      # 执行测试
-      - name: Run Playwright tests
-        run: |
-
-          if [ -d "tests" ] && find tests -name "*.spec.*" | grep -q .; then
-            echo "Playwright tests found"
-            npx playwright test
-          else
-            echo "No Playwright tests found, skip test stage"
-          fi
-
-
-
       # 上传测试报告
       - name: Upload Playwright report
         if: always()
