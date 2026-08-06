@@ -17,7 +17,7 @@ jobs:
     name: Build and Start Container
 
     # 必须使用自己的机器
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, windows]
 
 
     steps:
