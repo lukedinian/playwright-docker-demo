@@ -1,0 +1,71 @@
+name: CI — Test
+
+
+on:
+
+  pull_request:
+    branches:
+      - main
+
+
+
+jobs:
+
+  test:
+
+    name: Run Playwright Tests
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+
+      # 拉取代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+
+      # Node环境
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+
+
+      # 安装依赖
+      - name: Install dependencies
+        run: |
+
+          npm ci
+
+
+
+      # 安装Playwright浏览器
+      - name: Install Playwright browsers
+        run: |
+
+          npx playwright install --with-deps
+
+
+
+      # 执行测试
+      - name: Run Playwright tests
+        run: |
+
+          npx playwright test
+
+
+
+      # 上传测试报告
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+
+          name: playwright-report
+
+          path: playwright-report/

@@ -1,0 +1,111 @@
+name: CD — Deploy with docker-compose
+
+
+on:
+
+  push:
+    branches:
+      - main
+
+
+
+jobs:
+
+
+  deploy:
+
+
+    name: Deploy services
+
+
+    runs-on:
+
+      - self-hosted
+      - Windows
+
+
+
+    steps:
+
+
+
+      # 拉取代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+
+      # 检查Docker环境
+      - name: Check Docker
+        shell: powershell
+        run: |
+
+          docker --version
+
+          docker compose version
+
+
+
+      # 停止旧服务
+      - name: Stop old services
+        shell: powershell
+        run: |
+
+          docker compose down `
+            --remove-orphans
+
+
+
+      # 构建镜像
+      - name: Build services
+        shell: powershell
+        run: |
+
+          docker compose build
+
+
+          if ($LASTEXITCODE -ne 0) {
+
+              Write-Error "Docker compose build failed"
+
+              exit 1
+
+          }
+
+
+
+      # 后台启动服务
+      - name: Start services
+        shell: powershell
+        run: |
+
+          docker compose up -d
+
+
+          if ($LASTEXITCODE -ne 0) {
+
+              Write-Error "Docker compose start failed"
+
+              exit 1
+
+          }
+
+
+
+      # 检查服务状态
+      - name: Verify services
+        shell: powershell
+        run: |
+
+          docker compose ps
+
+
+
+      # 输出完成
+      - name: Deployment finished
+        shell: powershell
+        run: |
+
+          Write-Host "Deployment completed."
+
+          Write-Host "Services are running in background."
