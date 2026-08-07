@@ -17,7 +17,7 @@ module.exports = `
 </head>
 <body>
   <div class="card">
-    <h1>Hello from playwright-docker-demo2</h1>
+    <h1>Hello from playwright-docker-demo</h1>
     <p>This page is generated from <code>tests/example.spec.js</code>. Edit that file and push to trigger CI/CD — the deployed page will reflect your changes.</p>
     <p class="timestamp">Rendered at: ${new Date().toISOString()}</p>
     <p>Random tip: you can include any HTML here to verify deployment.</p>
